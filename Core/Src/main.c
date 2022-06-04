@@ -15,6 +15,9 @@
   *
   ******************************************************************************
   */
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -97,6 +100,10 @@ int main(void)
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
 
+    TIM3->CCR2 = 255;
+    TIM3->CCR3 = 255;
+    TIM3->CCR4 = 255;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -106,27 +113,47 @@ int main(void)
 //    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_1);
 
     uint8_t str[] = "USART1 is working!\r\n";
-    uint8_t receive_str[15] = "";
+    uint8_t receive_str[30] = "";
 
+    uint8_t is_led_work = 1;
+    int limit = 240;
   while (1)
   {
-      int limit = 240;
-      for (int i = 256; i >= limit; i--) {
-          TIM3->CCR2 = i;
-          TIM3->CCR3 = i;
-          TIM3->CCR4 = i;
-          HAL_Delay(50);
+
+      if(GPIO_PIN_SET == HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0)) {
+        is_led_work ^= 1;
       }
-      for (int i = limit; i <= 256; i++) {
-          TIM3->CCR2 = i;
-          TIM3->CCR3 = i;
-          TIM3->CCR4 = i;
-          HAL_Delay(50);
+      if (is_led_work) {
+          for (int32_t i = 256; i >= limit; i--) {
+              TIM3->CCR2 = i;
+              TIM3->CCR3 = i;
+              TIM3->CCR4 = i;
+              HAL_Delay(50);
+          }
+          for (int32_t i = limit; i <= 256; i++) {
+              TIM3->CCR2 = i;
+              TIM3->CCR3 = i;
+              TIM3->CCR4 = i;
+              HAL_Delay(50);
+          }
+      } else {
+          HAL_Delay(500);
       }
-      HAL_UART_Receive_IT(&huart1, receive_str, 15);
-      HAL_UART_Transmit(&huart1, receive_str, 15, 0xFFFF);
-      HAL_UART_Transmit(&huart1, "bip\r\n", 5, 0xFFFF);
-      receive_str[0] = '\0';
+
+      uint8_t limit_str[20];
+      memset(receive_str, '\0', 30);
+      memset(limit_str, '\0', 30);
+
+
+      HAL_UART_Receive_IT(&huart1, receive_str, 30);
+//      sscanf(receive_str, "%d", &limit);
+//      sprintf(limit_str, "%ыЯ\r\n", limit);
+
+
+      HAL_UART_Transmit(&huart1, receive_str, 30, 0xFFFF);
+//      while (HAL_UART_Transmit(&huart1, limit_str, 20, 0xFFFF) != HAL_OK) {
+//          HAL_Delay(20);
+//      }
 
 
 //      HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
@@ -292,17 +319,29 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12|GPIO_PIN_15, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : PA0 PA1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PB12 PB15 */
   GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB8 */
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
