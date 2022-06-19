@@ -43,6 +43,7 @@
 
 /* Private variables ---------------------------------------------------------*/
  TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim6;
 
 UART_HandleTypeDef huart1;
 
@@ -55,12 +56,20 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+uint8_t is_led_work = 0;
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    is_led_work ^= 1;
+}
 
 /* USER CODE END 0 */
 
@@ -94,11 +103,13 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM3_Init();
   MX_USART1_UART_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
+    HAL_TIM_Base_Start_IT(&htim6);
 
     TIM3->CCR2 = 255;
     TIM3->CCR3 = 255;
@@ -115,11 +126,9 @@ int main(void)
     uint8_t str[] = "USART1 is working!\r\n";
     uint8_t receive_str[30] = "";
 
-    uint8_t is_led_work = 1;
     int limit = 240;
   while (1)
   {
-
       if(GPIO_PIN_SET == HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0)) {
         is_led_work ^= 1;
       }
@@ -145,12 +154,12 @@ int main(void)
       memset(limit_str, '\0', 30);
 
 
-      HAL_UART_Receive_IT(&huart1, receive_str, 30);
+//      HAL_UART_Receive_IT(&huart1, receive_str, 30);
 //      sscanf(receive_str, "%d", &limit);
 //      sprintf(limit_str, "%ыЯ\r\n", limit);
 
 
-      HAL_UART_Transmit(&huart1, receive_str, 30, 0xFFFF);
+//      HAL_UART_Transmit(&huart1, receive_str, 30, 0xFFFF);
 //      while (HAL_UART_Transmit(&huart1, limit_str, 20, 0xFFFF) != HAL_OK) {
 //          HAL_Delay(20);
 //      }
@@ -273,6 +282,44 @@ static void MX_TIM3_Init(void)
   /* USER CODE BEGIN TIM3_Init 2 */
 
   /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
+  * @brief TIM6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 32000-1;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 5000-1;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
 
 }
 
