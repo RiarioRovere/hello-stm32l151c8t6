@@ -55,8 +55,8 @@ UART_HandleTypeDef huart1;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM3_Init(void);
-static void MX_USART1_UART_Init(void);
 static void MX_TIM6_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -64,11 +64,25 @@ static void MX_TIM6_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-uint8_t is_led_work = 0;
+uint32_t tim3_ccr2 = 0;
+uint32_t tim3_ccr3 = 0;
+uint32_t tim3_ccr4 = 0;
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-    is_led_work ^= 1;
+const int32_t buf_size = 17;
+uint8_t input_buffer[17] = {0};
+
+void ParseMessage() {
+    int32_t r = 0, b = 0, g = 0;
+    r = (input_buffer[4] - '0') * 100 + (input_buffer[5] - '0') * 10 + input_buffer[6] - '0';
+    b = (input_buffer[8] - '0') * 100 + (input_buffer[9] - '0') * 10 + input_buffer[10] - '0';
+    g = (input_buffer[12] - '0') * 100 + (input_buffer[13] - '0') * 10 + input_buffer[14] - '0';
+    TIM3->CCR2 = r;
+    TIM3->CCR3 = b;
+    TIM3->CCR4 = g;
+}
+
+void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart) {
+    ParseMessage();
 }
 
 /* USER CODE END 0 */
@@ -102,16 +116,18 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_TIM3_Init();
-  MX_USART1_UART_Init();
   MX_TIM6_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
-    HAL_TIM_Base_Start_IT(&htim6);
+//    HAL_TIM_Base_Start_IT(&htim6);
+//    UART_Start_Receive_IT(&huart1, input_buffer, buf_size);
+//    HAL_UART_Receive_IT(&huart1, input_buffer, buf_size);
 
-    TIM3->CCR2 = 255;
+    TIM3->CCR2 = 250;
     TIM3->CCR3 = 255;
     TIM3->CCR4 = 255;
 
@@ -123,50 +139,13 @@ int main(void)
 //    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
 //    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_1);
 
-    uint8_t str[] = "USART1 is working!\r\n";
-    uint8_t receive_str[30] = "";
 
-    int limit = 240;
   while (1)
   {
-      if(GPIO_PIN_SET == HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0)) {
-        is_led_work ^= 1;
-      }
-      if (is_led_work) {
-          for (int32_t i = 256; i >= limit; i--) {
-              TIM3->CCR2 = i;
-              TIM3->CCR3 = i;
-              TIM3->CCR4 = i;
-              HAL_Delay(50);
-          }
-          for (int32_t i = limit; i <= 256; i++) {
-              TIM3->CCR2 = i;
-              TIM3->CCR3 = i;
-              TIM3->CCR4 = i;
-              HAL_Delay(50);
-          }
-      } else {
-          HAL_Delay(500);
-      }
-
-      uint8_t limit_str[20];
-      memset(receive_str, '\0', 30);
-      memset(limit_str, '\0', 30);
-
-
-//      HAL_UART_Receive_IT(&huart1, receive_str, 30);
-//      sscanf(receive_str, "%d", &limit);
-//      sprintf(limit_str, "%ыЯ\r\n", limit);
-
-
-//      HAL_UART_Transmit(&huart1, receive_str, 30, 0xFFFF);
-//      while (HAL_UART_Transmit(&huart1, limit_str, 20, 0xFFFF) != HAL_OK) {
-//          HAL_Delay(20);
-//      }
-
-
-//      HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);
-//      HAL_Delay(1000);
+      HAL_UART_Receive(&huart1, input_buffer, buf_size, 0xFFFF);
+      ParseMessage();
+      HAL_UART_Transmit(&huart1, input_buffer, buf_size, 0xFFFF);
+      HAL_Delay(1000);
 
     /* USER CODE END WHILE */
 
