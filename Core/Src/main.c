@@ -64,10 +64,6 @@ static void MX_USART1_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-uint32_t tim3_ccr2 = 0;
-uint32_t tim3_ccr3 = 0;
-uint32_t tim3_ccr4 = 0;
-
 const int32_t buf_size = 17;
 uint8_t input_buffer[17] = {0};
 
@@ -125,9 +121,9 @@ int main(void)
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
 //    HAL_TIM_Base_Start_IT(&htim6);
 //    UART_Start_Receive_IT(&huart1, input_buffer, buf_size);
-//    HAL_UART_Receive_IT(&huart1, input_buffer, buf_size);
+    HAL_UART_Receive_IT(&huart1, input_buffer, buf_size);
 
-    TIM3->CCR2 = 250;
+    TIM3->CCR2 = 255;
     TIM3->CCR3 = 255;
     TIM3->CCR4 = 255;
 
@@ -142,10 +138,13 @@ int main(void)
 
   while (1)
   {
-      HAL_UART_Receive(&huart1, input_buffer, buf_size, 0xFFFF);
-      ParseMessage();
-      HAL_UART_Transmit(&huart1, input_buffer, buf_size, 0xFFFF);
-      HAL_Delay(1000);
+      if (HAL_UART_Receive_IT(&huart1, input_buffer, buf_size) == HAL_OK) {
+          HAL_UART_Transmit(&huart1, input_buffer, buf_size, 0xFFFF);
+      }
+//      HAL_UART_Receive(&huart1, input_buffer, buf_size, 0xFFFF);
+//      ParseMessage();
+//      HAL_UART_Transmit(&huart1, input_buffer, buf_size, 0xFFFF);
+//      HAL_Delay(1000);
 
     /* USER CODE END WHILE */
 
