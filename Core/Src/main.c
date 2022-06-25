@@ -24,6 +24,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "ring_buf.h"
 
 /* USER CODE END Includes */
 
@@ -64,8 +65,10 @@ static void MX_USART1_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-const int32_t buf_size = 17;
-uint8_t input_buffer[17] = {0};
+static RINGBUF_t buf; // ringbuffer instance
+
+const int32_t buf_size = 1;
+uint8_t input_buffer[1] = {0};
 
 void ParseMessage() {
     int32_t r = 0, b = 0, g = 0;
@@ -77,8 +80,15 @@ void ParseMessage() {
     TIM3->CCR4 = g;
 }
 
+u16_t msg_is_ready = 0;
+
 void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart) {
-    ParseMessage();
+    RingBuf_BytePut(input_buffer[0], &buf);
+    if (input_buffer[0] == '\n') {
+        msg_is_ready = 1;
+    }
+    HAL_UART_Receive_IT(&huart1, input_buffer, buf_size);
+//    ParseMessage();
 }
 
 /* USER CODE END 0 */
@@ -116,11 +126,13 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
+    static u8_t ringbuf8_data[100] = {0,}; // static data buffer
+    RingBuf_Init(ringbuf8_data, 100, sizeof(u8_t), &buf);
+
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
 //    HAL_TIM_Base_Start_IT(&htim6);
-//    UART_Start_Receive_IT(&huart1, input_buffer, buf_size);
     HAL_UART_Receive_IT(&huart1, input_buffer, buf_size);
 
     TIM3->CCR2 = 255;
@@ -138,13 +150,17 @@ int main(void)
 
   while (1)
   {
-      if (HAL_UART_Receive_IT(&huart1, input_buffer, buf_size) == HAL_OK) {
-          HAL_UART_Transmit(&huart1, input_buffer, buf_size, 0xFFFF);
+      if (msg_is_ready) {
+          msg_is_ready = 0;
+          u8_t character = 0;
+          u16_t available = 0;
+          do {
+              RingBuf_ByteRead(&character, &buf);
+              input_buffer[0] = character;
+              HAL_UART_Transmit(&huart1, input_buffer, 1, 0xFFFF);
+              RingBuf_Available(&available, &buf);
+          } while (character != '\n' && available > 0);
       }
-//      HAL_UART_Receive(&huart1, input_buffer, buf_size, 0xFFFF);
-//      ParseMessage();
-//      HAL_UART_Transmit(&huart1, input_buffer, buf_size, 0xFFFF);
-//      HAL_Delay(1000);
 
     /* USER CODE END WHILE */
 
