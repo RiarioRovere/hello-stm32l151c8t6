@@ -9,7 +9,7 @@
  *******************************************
  */
 
-#include "../Inc/ring_buf.h"
+#include "ring_buf.h"
 
 /**
  * @addtogroup RING_BUF
