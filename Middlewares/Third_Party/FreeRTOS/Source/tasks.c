@@ -268,10 +268,10 @@ to its original value when it is released. */
  */
 typedef struct tskTaskControlBlock
 {
-	volatile StackType_t	*pxTopOfStack;	/*< Points to the location of the last item placed on the tasks stack.  THIS MUST BE THE BTN1 MEMBER OF THE TCB STRUCT. */
+	volatile StackType_t	*pxTopOfStack;	/*< Points to the location of the last item placed on the tasks stack.  THIS MUST BE THE FIRST MEMBER OF THE TCB STRUCT. */
 
 	#if ( portUSING_MPU_WRAPPERS == 1 )
-		xMPU_SETTINGS	xMPUSettings;		/*< The MPU settings are defined as part of the port layer.  THIS MUST BE THE BTN2 MEMBER OF THE TCB STRUCT. */
+		xMPU_SETTINGS	xMPUSettings;		/*< The MPU settings are defined as part of the port layer.  THIS MUST BE THE SECOND MEMBER OF THE TCB STRUCT. */
 	#endif
 
 	ListItem_t			xStateListItem;	/*< The list that the state list item of a task is reference from denotes the state of that task (Ready, Blocked, Suspended ). */

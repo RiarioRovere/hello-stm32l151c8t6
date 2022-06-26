@@ -11,6 +11,10 @@
 #ifndef RING_BUF_H_
 #define RING_BUF_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "libs.h"
 
 /**
@@ -65,5 +69,9 @@ RINGBUF_STATUS RingBuf_CellWatch(void *data, RINGBUF_t *rb); // Watch 1 cell fro
 RINGBUF_STATUS RingBuf_DataWatch(void *data, u16_t len, RINGBUF_t *rb); // Watch data form buf
 
 /// @} RING_BUF Group
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* RING_BUF_H_ */

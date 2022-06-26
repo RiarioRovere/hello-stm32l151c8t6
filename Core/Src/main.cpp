@@ -47,36 +47,14 @@
 
 /* Private variables ---------------------------------------------------------*/
  TIM_HandleTypeDef htim3;
-TIM_HandleTypeDef htim6;
 
 UART_HandleTypeDef huart1;
 
-/* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for ledTask */
-osThreadId_t ledTaskHandle;
-const osThreadAttr_t ledTask_attributes = {
-  .name = "ledTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for uartTask */
-osThreadId_t uartTaskHandle;
-const osThreadAttr_t uartTask_attributes = {
-  .name = "uartTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for ledCommands */
-osMessageQueueId_t ledCommandsHandle;
-const osMessageQueueAttr_t ledCommands_attributes = {
-  .name = "ledCommands"
-};
+osThreadId defaultTaskHandle;
+uint32_t defaultTaskBuffer[ 64 ];
+osStaticThreadDef_t defaultTaskControlBlock;
+osThreadId uartTaskHandle;
+osMessageQId ledCommandsHandle;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -85,11 +63,9 @@ const osMessageQueueAttr_t ledCommands_attributes = {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM3_Init(void);
-static void MX_TIM6_Init(void);
 static void MX_USART1_UART_Init(void);
-void StartDefaultTask(void *argument);
-void StartLedTask(void *argument);
-void StartUartTask(void *argument);
+void StartDefaultTask(void const * argument);
+void StartUartTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -155,7 +131,6 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_TIM3_Init();
-  MX_TIM6_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
@@ -174,46 +149,39 @@ int main(void)
 
   /* USER CODE END 2 */
 
-  /* Init scheduler */
-  osKernelInitialize();
-
   /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
+    /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
+    /* add semaphores, ... */
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
-  /* start timers, add new ones, ... */
+    /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
   /* Create the queue(s) */
-  /* creation of ledCommands */
-  ledCommandsHandle = osMessageQueueNew (8, sizeof(TButtonMsg), &ledCommands_attributes);
+  /* definition and creation of ledCommands */
+  osMessageQDef(ledCommands, 1, TButtonMsg);
+  ledCommandsHandle = osMessageCreate(osMessageQ(ledCommands), NULL);
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
+    /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  /* definition and creation of defaultTask */
+  osThreadStaticDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 64, defaultTaskBuffer, &defaultTaskControlBlock);
+  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
-  /* creation of ledTask */
-  ledTaskHandle = osThreadNew(StartLedTask, NULL, &ledTask_attributes);
-
-  /* creation of uartTask */
-  uartTaskHandle = osThreadNew(StartUartTask, NULL, &uartTask_attributes);
+  /* definition and creation of uartTask */
+  osThreadDef(uartTask, StartUartTask, osPriorityIdle, 0, 64);
+  uartTaskHandle = osThreadCreate(osThread(uartTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+    /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
-
-  /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
-  /* USER CODE END RTOS_EVENTS */
 
   /* Start scheduler */
   osKernelStart();
@@ -226,24 +194,24 @@ int main(void)
 //    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_1);
 
 
-  while (1)
-  {
-      if (msg_is_ready) {
-          msg_is_ready = 0;
-          u8_t character = 0;
-          u16_t available = 0;
-          do {
-              RingBuf_ByteRead(&character, &buf);
-              input_buffer[0] = character;
-              HAL_UART_Transmit(&huart1, input_buffer, 1, 0xFFFF);
-              RingBuf_Available(&available, &buf);
-          } while (character != '\n' && available > 0);
-      }
+    while (1)
+    {
+        if (msg_is_ready) {
+            msg_is_ready = 0;
+            u8_t character = 0;
+            u16_t available = 0;
+            do {
+                RingBuf_ByteRead(&character, &buf);
+                input_buffer[0] = character;
+                HAL_UART_Transmit(&huart1, input_buffer, 1, 0xFFFF);
+                RingBuf_Available(&available, &buf);
+            } while (character != '\n' && available > 0);
+        }
 
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+    }
   /* USER CODE END 3 */
 }
 
@@ -358,44 +326,6 @@ static void MX_TIM3_Init(void)
 }
 
 /**
-  * @brief TIM6 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM6_Init(void)
-{
-
-  /* USER CODE BEGIN TIM6_Init 0 */
-
-  /* USER CODE END TIM6_Init 0 */
-
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM6_Init 1 */
-
-  /* USER CODE END TIM6_Init 1 */
-  htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 32000-1;
-  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 5000-1;
-  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM6_Init 2 */
-
-  /* USER CODE END TIM6_Init 2 */
-
-}
-
-/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -476,37 +406,37 @@ static void MX_GPIO_Init(void)
   * @retval None
   */
 /* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
+void StartDefaultTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-  for(;;)
-  {
-      for (size_t i = 0; i < sizeof(BUTTONS) / sizeof(BUTTONS[0]); ++i) {
-          Button *btn = &BUTTONS[i];
-          if (HAL_GPIO_ReadPin(btn->GPIOx, btn->GPIO_Pin) == GPIO_PIN_SET) {
-              TButtonMsg msg = {
-                      .button = btn->button,
-                      .state = PRESSED,
-              };
-              xQueueSendToBack(ledCommandsHandle, &msg, 10);
-          }
-      }
-      osDelay(200);
-  }
+    /* Infinite loop */
+    for(;;)
+    {
+        for (size_t i = 0; i < sizeof(BUTTONS) / sizeof(BUTTONS[0]); ++i) {
+            Button *btn = &BUTTONS[i];
+            if (HAL_GPIO_ReadPin(btn->GPIOx, btn->GPIO_Pin) == GPIO_PIN_SET) {
+                TButtonMsg msg = {
+                        .button = btn->button,
+                        .state = PRESSED,
+                };
+                xQueueSendToBack(ledCommandsHandle, &msg, 10);
+            }
+        }
+        osDelay(200);
+    }
   /* USER CODE END 5 */
 }
 
-/* USER CODE BEGIN Header_StartLedTask */
+/* USER CODE BEGIN Header_StartUartTask */
 /**
-* @brief Function implementing the ledTask thread.
+* @brief Function implementing the uartTask thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartLedTask */
-void StartLedTask(void *argument)
+/* USER CODE END Header_StartUartTask */
+void StartUartTask(void const * argument)
 {
-  /* USER CODE BEGIN StartLedTask */
+  /* USER CODE BEGIN StartUartTask */
   /* Infinite loop */
   for(;;)
   {
@@ -518,24 +448,6 @@ void StartLedTask(void *argument)
           HAL_UART_Transmit(&huart1, (uint8_t *)buffer, 6, 0xFFFF);
       }
       osDelay(100);
-  }
-  /* USER CODE END StartLedTask */
-}
-
-/* USER CODE BEGIN Header_StartUartTask */
-/**
-* @brief Function implementing the uartTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartUartTask */
-void StartUartTask(void *argument)
-{
-  /* USER CODE BEGIN StartUartTask */
-  /* Infinite loop */
-  for(;;)
-  {
-      osDelay(500);
   }
   /* USER CODE END StartUartTask */
 }
@@ -568,11 +480,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+    /* User can add his own implementation to report the HAL error return state */
+    __disable_irq();
+    while (1)
+    {
+    }
   /* USER CODE END Error_Handler_Debug */
 }
 
