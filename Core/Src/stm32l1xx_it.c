@@ -56,7 +56,7 @@
 
 /* External variables --------------------------------------------------------*/
 extern UART_HandleTypeDef huart1;
-extern TIM_HandleTypeDef htim10;
+extern TIM_HandleTypeDef htim11;
 
 /* USER CODE BEGIN EV */
 
@@ -161,17 +161,17 @@ void DebugMon_Handler(void)
 /******************************************************************************/
 
 /**
-  * @brief This function handles TIM10 global interrupt.
+  * @brief This function handles TIM11 global interrupt.
   */
-void TIM10_IRQHandler(void)
+void TIM11_IRQHandler(void)
 {
-  /* USER CODE BEGIN TIM10_IRQn 0 */
+  /* USER CODE BEGIN TIM11_IRQn 0 */
 
-  /* USER CODE END TIM10_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim10);
-  /* USER CODE BEGIN TIM10_IRQn 1 */
+  /* USER CODE END TIM11_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim11);
+  /* USER CODE BEGIN TIM11_IRQn 1 */
 
-  /* USER CODE END TIM10_IRQn 1 */
+  /* USER CODE END TIM11_IRQn 1 */
 }
 
 /**

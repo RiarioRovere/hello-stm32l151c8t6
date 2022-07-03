@@ -28,6 +28,7 @@
 #include "../Application/ring_buf.h"
 #include "../Application/msgs.h"
 #include "queue.h"
+#include "../Application/sequence.h"
 
 /* USER CODE END Includes */
 
@@ -47,6 +48,7 @@
 
 /* Private variables ---------------------------------------------------------*/
  TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim10;
 
 UART_HandleTypeDef huart1;
 
@@ -54,7 +56,14 @@ osThreadId defaultTaskHandle;
 uint32_t defaultTaskBuffer[ 64 ];
 osStaticThreadDef_t defaultTaskControlBlock;
 osThreadId uartTaskHandle;
+uint32_t uartTaskBuffer[ 64 ];
+osStaticThreadDef_t uartTaskControlBlock;
+osThreadId ledTaskHandle;
+uint32_t ledTaskBuffer[ 64 ];
+osStaticThreadDef_t ledTaskControlBlock;
 osMessageQId ledCommandsHandle;
+uint8_t ledCommandsBuffer[ 1 * sizeof( TButtonMsg ) ];
+osStaticMessageQDef_t ledCommandsControlBlock;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -64,8 +73,10 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM10_Init(void);
 void StartDefaultTask(void const * argument);
 void StartUartTask(void const * argument);
+void StartLedTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -90,6 +101,9 @@ void ParseMessage() {
 }
 
 u16_t msg_is_ready = 0;
+
+Seq::Led LED(&(TIM3->CCR2), &(TIM3->CCR4), &(TIM3->CCR3));
+Seq::Vibro VIBRO(&(TIM10->CCR1));
 
 void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart) {
     RingBuf_BytePut(input_buffer[0], &buf);
@@ -132,6 +146,7 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM3_Init();
   MX_USART1_UART_Init();
+  MX_TIM10_Init();
   /* USER CODE BEGIN 2 */
 
     static u8_t ringbuf8_data[100] = {0,}; // static data buffer
@@ -140,12 +155,17 @@ int main(void)
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
+
+    HAL_TIM_PWM_Start(&htim10, TIM_CHANNEL_1);
 //    HAL_TIM_Base_Start_IT(&htim6);
     HAL_UART_Receive_IT(&huart1, input_buffer, buf_size);
 
     TIM3->CCR2 = 255;
     TIM3->CCR3 = 255;
     TIM3->CCR4 = 255;
+
+//    TIM10->CCR1 = 99;
+
 
   /* USER CODE END 2 */
 
@@ -163,7 +183,7 @@ int main(void)
 
   /* Create the queue(s) */
   /* definition and creation of ledCommands */
-  osMessageQDef(ledCommands, 1, TButtonMsg);
+  osMessageQStaticDef(ledCommands, 1, TButtonMsg, ledCommandsBuffer, &ledCommandsControlBlock);
   ledCommandsHandle = osMessageCreate(osMessageQ(ledCommands), NULL);
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -176,8 +196,12 @@ int main(void)
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of uartTask */
-  osThreadDef(uartTask, StartUartTask, osPriorityIdle, 0, 64);
+  osThreadStaticDef(uartTask, StartUartTask, osPriorityIdle, 0, 64, uartTaskBuffer, &uartTaskControlBlock);
   uartTaskHandle = osThreadCreate(osThread(uartTask), NULL);
+
+  /* definition and creation of ledTask */
+  osThreadStaticDef(ledTask, StartLedTask, osPriorityBelowNormal, 0, 64, ledTaskBuffer, &ledTaskControlBlock);
+  ledTaskHandle = osThreadCreate(osThread(ledTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
     /* add threads, ... */
@@ -280,7 +304,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 256;
+  htim3.Init.Period = 256 - 1;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -322,6 +346,57 @@ static void MX_TIM3_Init(void)
   /* USER CODE BEGIN TIM3_Init 2 */
 
   /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
+  * @brief TIM10 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM10_Init(void)
+{
+
+  /* USER CODE BEGIN TIM10_Init 0 */
+
+  /* USER CODE END TIM10_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM10_Init 1 */
+
+  /* USER CODE END TIM10_Init 1 */
+  htim10.Instance = TIM10;
+  htim10.Init.Prescaler = 0;
+  htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim10.Init.Period = 100-1;
+  htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim10.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim10, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim10) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim10, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM10_Init 2 */
+
+  /* USER CODE END TIM10_Init 2 */
 
 }
 
@@ -372,7 +447,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12|GPIO_PIN_15, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : BTN1_Pin BTN2_Pin */
   GPIO_InitStruct.Pin = BTN1_Pin|BTN2_Pin;
@@ -380,8 +455,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB12 PB15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_15;
+  /*Configure GPIO pin : PB15 */
+  GPIO_InitStruct.Pin = GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -452,9 +527,47 @@ void StartUartTask(void const * argument)
   /* USER CODE END StartUartTask */
 }
 
+/* USER CODE BEGIN Header_StartLedTask */
+/**
+* @brief Function implementing the ledTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartLedTask */
+void StartLedTask(void const * argument)
+{
+  /* USER CODE BEGIN StartLedTask */
+
+  VIBRO
+        .set(50, 1000)
+        .set(0, 1000)
+        ;
+
+    LED
+            .set({255, 240, 255})
+            .wait(1000)
+            .set({255, 255, 240})
+            .wait(1000)
+            .set({240, 255, 255})
+            .wait(1000)
+            ;
+
+  /* Infinite loop */
+  for(;;)
+  {
+      LED
+          .set({255, 240, 255}, 1000)
+          .set({255, 255, 245}, 1000)
+          .set({245, 255, 255}, 1000)
+          .set({255, 255, 255}, 1000)
+          ;
+  }
+  /* USER CODE END StartLedTask */
+}
+
 /**
   * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM10 interrupt took place, inside
+  * @note   This function is called  when TIM11 interrupt took place, inside
   * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
   * a global variable "uwTick" used as application time base.
   * @param  htim : TIM handle
@@ -465,7 +578,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   /* USER CODE BEGIN Callback 0 */
 
   /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM10) {
+  if (htim->Instance == TIM11) {
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
