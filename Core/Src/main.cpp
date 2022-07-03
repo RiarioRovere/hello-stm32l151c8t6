@@ -25,10 +25,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "../Application/ring_buf.h"
+#include "../Application/ring_buffer.h"
 #include "../Application/msgs.h"
 #include "queue.h"
 #include "../Application/sequence.h"
+#include "../Application/libs.h"
 
 /* USER CODE END Includes */
 
@@ -85,33 +86,27 @@ void StartLedTask(void const * argument);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-static RINGBUF_t buf; // ringbuffer instance
+TRingBuffer RING_BUFFER;
 
 const int32_t buf_size = 1;
 uint8_t input_buffer[1] = {0};
 
-void ParseMessage() {
+void ParseMessage(char *buffer) {
     int32_t r = 0, b = 0, g = 0;
-    r = (input_buffer[4] - '0') * 100 + (input_buffer[5] - '0') * 10 + input_buffer[6] - '0';
-    b = (input_buffer[8] - '0') * 100 + (input_buffer[9] - '0') * 10 + input_buffer[10] - '0';
-    g = (input_buffer[12] - '0') * 100 + (input_buffer[13] - '0') * 10 + input_buffer[14] - '0';
+    r = (buffer[4] - '0') * 100 + (buffer[5] - '0') * 10 + buffer[6] - '0';
+    g = (buffer[8] - '0') * 100 + (buffer[9] - '0') * 10 + buffer[10] - '0';
+    b = (buffer[12] - '0') * 100 + (buffer[13] - '0') * 10 + buffer[14] - '0';
     TIM3->CCR2 = r;
     TIM3->CCR3 = b;
     TIM3->CCR4 = g;
 }
 
-u16_t msg_is_ready = 0;
-
 Seq::Led LED(&(TIM3->CCR2), &(TIM3->CCR4), &(TIM3->CCR3));
 Seq::Vibro VIBRO(&(TIM10->CCR1));
 
 void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart) {
-    RingBuf_BytePut(input_buffer[0], &buf);
-    if (input_buffer[0] == '\n') {
-        msg_is_ready = 1;
-    }
+    RING_BUFFER.Add(input_buffer[0]);
     HAL_UART_Receive_IT(&huart1, input_buffer, buf_size);
-//    ParseMessage();
 }
 
 /* USER CODE END 0 */
@@ -149,8 +144,6 @@ int main(void)
   MX_TIM10_Init();
   /* USER CODE BEGIN 2 */
 
-    static u8_t ringbuf8_data[100] = {0,}; // static data buffer
-    RingBuf_Init(ringbuf8_data, 100, sizeof(u8_t), &buf);
 
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
@@ -220,17 +213,17 @@ int main(void)
 
     while (1)
     {
-        if (msg_is_ready) {
-            msg_is_ready = 0;
-            u8_t character = 0;
-            u16_t available = 0;
-            do {
-                RingBuf_ByteRead(&character, &buf);
-                input_buffer[0] = character;
-                HAL_UART_Transmit(&huart1, input_buffer, 1, 0xFFFF);
-                RingBuf_Available(&available, &buf);
-            } while (character != '\n' && available > 0);
-        }
+//        if (msg_is_ready) {
+//            msg_is_ready = 0;
+//            u8_t character = 0;
+//            u16_t available = 0;
+//            do {
+//                RingBuf_ByteRead(&character, &buf);
+//                input_buffer[0] = character;
+//                HAL_UART_Transmit(&huart1, input_buffer, 1, 0xFFFF);
+//                RingBuf_Available(&available, &buf);
+//            } while (character != '\n' && available > 0);
+//        }
 
     /* USER CODE END WHILE */
 
@@ -483,10 +476,27 @@ static void MX_GPIO_Init(void)
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void const * argument)
 {
+    static char commandBuffer[100];
+    static i32_t bufferPtr = 0;
   /* USER CODE BEGIN 5 */
     /* Infinite loop */
     for(;;)
     {
+        if (RING_BUFFER.WordsCnt()) {
+            bufferPtr = 0;
+            u8_t c[1];
+            do {
+                c[0] = RING_BUFFER.Take();
+                HAL_UART_Transmit(&huart1, c, 1, 0xFFFF);
+                commandBuffer[bufferPtr++] = c[0];
+            } while (c[0] != '\n');
+
+            int res = strncmp(commandBuffer, "SetColor", 8);
+            if (res == 0) {
+                ParseMessage(commandBuffer + 9);
+                HAL_UART_Transmit(&huart1, (uint8_t *) "!\n", 2, 0xFFFF);
+            }
+        }
         for (size_t i = 0; i < sizeof(BUTTONS) / sizeof(BUTTONS[0]); ++i) {
             Button *btn = &BUTTONS[i];
             if (HAL_GPIO_ReadPin(btn->GPIOx, btn->GPIO_Pin) == GPIO_PIN_SET) {
@@ -560,6 +570,7 @@ void StartLedTask(void const * argument)
           .set({255, 255, 245}, 1000)
           .set({245, 255, 255}, 1000)
           .set({255, 255, 255}, 1000)
+          .wait(4000)
           ;
   }
   /* USER CODE END StartLedTask */
