@@ -30,6 +30,7 @@
 #include "queue.h"
 #include "../Application/sequence.h"
 #include "../Application/libs.h"
+#include "../Application/cc1101.h"
 
 /* USER CODE END Includes */
 
@@ -156,7 +157,7 @@ int main(void)
     HAL_TIM_PWM_Start(&htim10, TIM_CHANNEL_1);
 //    HAL_TIM_Base_Start_IT(&htim6);
     HAL_UART_Receive_IT(&huart1, input_buffer, buf_size);
-    HAL_SPI_Init()
+
 
     TIM3->CCR2 = 255;
     TIM3->CCR3 = 255;
@@ -584,6 +585,10 @@ void StartDefaultTask(void const * argument)
 void StartUartTask(void const * argument)
 {
   /* USER CODE BEGIN StartUartTask */
+
+    RF::Radio radio = RF::Radio();
+    osDelay(500);
+    radio.Reset();
   /* Infinite loop */
   for(;;)
   {
@@ -594,7 +599,14 @@ void StartUartTask(void const * argument)
           buffer[3] = b;
           HAL_UART_Transmit(&huart1, (uint8_t *)buffer, 6, 0xFFFF);
       }
-      osDelay(100);
+
+      radio.WriteTxFifo(1);
+      radio.WriteTxFifo(1);
+      radio.EnterTxMode();
+
+      RF::Status status;
+      status = radio.GetStatus();
+      osDelay(10);
   }
   /* USER CODE END StartUartTask */
 }
@@ -610,19 +622,19 @@ void StartLedTask(void const * argument)
 {
   /* USER CODE BEGIN StartLedTask */
 
-  VIBRO
-        .set(50, 1000)
-        .set(0, 1000)
-        ;
+//  VIBRO
+//        .set(50, 1000)
+//        .set(0, 1000)
+//        ;
 
     LED
-            .set({255, 240, 255})
-            .wait(1000)
-            .set({255, 255, 240})
-            .wait(1000)
-            .set({240, 255, 255})
-            .wait(1000)
-            ;
+        .set({255, 240, 255})
+        .wait(1000)
+        .set({255, 255, 240})
+        .wait(1000)
+        .set({240, 255, 255})
+        .wait(1000)
+        ;
 
   /* Infinite loop */
   for(;;)
