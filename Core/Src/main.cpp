@@ -598,14 +598,32 @@ void StartUartTask(void const * argument)
           static char buffer[] = "btnX\r\n";
           buffer[3] = b;
           HAL_UART_Transmit(&huart1, (uint8_t *)buffer, 6, 0xFFFF);
-      }
 
-      radio.WriteTxFifo(1);
-      radio.WriteTxFifo(1);
-      radio.EnterTxMode();
+//          radio.WriteTxFifo(1);
+//          radio.WriteTxFifo(1);
+//          radio.EnterTxMode();
+
+          auto status = radio.GetStatus();
+          if (status.state == RF::IDLE || status.state == RF::FSTXON) {
+              radio.EnterRxMode();
+          }
+      }
 
       RF::Status status;
       status = radio.GetStatus();
+      if (status.state == RF::RXFIFO_OVERFLOW) {
+          static char buffer[] = "overflow\r\n";
+          int left_rx_fifo = status.available;
+          int cnt = 0;
+
+          do {
+              buffer[cnt++] = left_rx_fifo % 10 + '0';
+              left_rx_fifo /= 10;
+          } while (left_rx_fifo > 0);
+
+          HAL_UART_Transmit(&huart1, (uint8_t *)buffer, 10, 0xFFFF);
+          radio.SendStrobe(RF::SFRX);
+      }
       osDelay(10);
   }
   /* USER CODE END StartUartTask */
@@ -646,6 +664,8 @@ void StartLedTask(void const * argument)
           .set({255, 255, 255}, 1000)
           .wait(4000)
           ;
+
+
   }
   /* USER CODE END StartLedTask */
 }

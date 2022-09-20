@@ -28,9 +28,9 @@ u8_t SNOP =     0x3D; // No operation. May be used to get access to the chip sta
 
 // STATUS BYTE BLOCK
 
-u8_t CHIP_RDY_MASK = 0x80;
-u8_t STATE_MASK = 0x70;
-u8_t FIFO_AVAIL_MASK = 0x0F; // The number of bytes available in the RX FIFO or free bytes in the TX FIFO
+u8_t CHIP_RDY_MASK =    0x80;
+u8_t STATE_MASK =       0x70;
+u8_t FIFO_AVAIL_MASK =  0x0F; // The number of bytes available in the RX FIFO or free bytes in the TX FIFO
 
 enum EStatus {
     IDLE =              0b000, // IDLE state (Also reported for some transitional states instead of SETTLING or CALIBRATE)
@@ -97,7 +97,8 @@ public:
         tx_buffer[0] = SRES;
         HAL_SPI_TransmitReceive(&hspi1, tx_buffer, rx_buffer, 1, 0xFFFF);
         while (!IsReady()) {}
-        WriteRegister(MCSM1, 0x3E);
+//        WriteRegister(MCSM1, 0x3E);
+        WriteRegister(MCSM1, 0x10);
     }
 
     bool IsReady() {
@@ -140,7 +141,7 @@ public:
     }
 
     Status GetStatus() {
-        tx_buffer[0] = SNOP | WRITE_FLAG;
+        tx_buffer[0] = SNOP | READ_FLAG;
         HAL_SPI_TransmitReceive(&hspi1, tx_buffer, rx_buffer, 1, 0xFFFF);
         return Status(rx_buffer[0]);
     }
@@ -148,8 +149,6 @@ private:
     u8_t tx_buffer[1];
     u8_t rx_buffer[1];
 };
-
-
 
 } // namespace RF
 
