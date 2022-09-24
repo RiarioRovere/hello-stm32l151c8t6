@@ -523,7 +523,6 @@ static void MX_GPIO_Init(void)
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI3_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI3_IRQn);
-
 }
 
 /* USER CODE BEGIN 4 */
@@ -589,6 +588,8 @@ void StartUartTask(void const * argument)
     RF::Radio radio = RF::Radio();
     osDelay(500);
     radio.Reset();
+    int ext_status;
+    int rx_bytes;
   /* Infinite loop */
   for(;;)
   {
@@ -599,21 +600,26 @@ void StartUartTask(void const * argument)
           buffer[3] = b;
           HAL_UART_Transmit(&huart1, (uint8_t *)buffer, 6, 0xFFFF);
 
+          ext_status = radio.ReadRegister(RF::MARCSTATE);
+
 //          radio.WriteTxFifo(1);
 //          radio.WriteTxFifo(1);
 //          radio.EnterTxMode();
 
           auto status = radio.GetStatus();
-          if (status.state == RF::IDLE || status.state == RF::FSTXON) {
+          if (status.state == RF::IDLE) {
               radio.EnterRxMode();
           }
       }
 
       RF::Status status;
       status = radio.GetStatus();
+      ext_status = radio.ReadRegister(RF::MARCSTATE);
+      rx_bytes = radio.ReadRegister(0xFB);
       if (status.state == RF::RXFIFO_OVERFLOW) {
+
           static char buffer[] = "overflow\r\n";
-          int left_rx_fifo = status.available;
+          uint8_t left_rx_fifo = status.available;
           int cnt = 0;
 
           do {

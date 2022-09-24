@@ -50,10 +50,17 @@ u8_t BURST_ACCESS_TX_FIFO =     0x7F;
 u8_t SINGLE_BYTE_RX_FIFO =      0xBF;
 u8_t BURST_ACCESS_RX_FIFO =     0xFF;
 u8_t MARCSTATE =                0x35 | 0xC0;
-u8_t MCSM1 =                    0x17; //0x3F for stay in tx, stay in rx
+u8_t MCSM1 =                     0x17; //0x3F for stay in tx, stay in rx
 u8_t READ_FLAG =                0x80;
 u8_t WRITE_FLAG =               0x00;
 u8_t BURST_FLAG =               0x40;
+
+
+// REGISTERS
+u8_t PKTCTRL0 = 0x08; // 0b01000100
+u8_t PKTCTRL1 = 0x07; // 0b00001100
+u8_t PKTLEN = 0x06; // PACKET_LENGTH = 5
+
 
 class Status {
 public:
@@ -99,6 +106,9 @@ public:
         while (!IsReady()) {}
 //        WriteRegister(MCSM1, 0x3E);
         WriteRegister(MCSM1, 0x10);
+        WriteRegister(PKTCTRL0, 0b01000100);
+        WriteRegister(PKTCTRL1, 0b00001100);
+        WriteRegister(PKTLEN, 5);
     }
 
     bool IsReady() {
