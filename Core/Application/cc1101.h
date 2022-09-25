@@ -50,7 +50,8 @@ u8_t BURST_ACCESS_TX_FIFO =     0x7F;
 u8_t SINGLE_BYTE_RX_FIFO =      0xBF;
 u8_t BURST_ACCESS_RX_FIFO =     0xFF;
 u8_t MARCSTATE =                0x35 | 0xC0;
-u8_t MCSM1 =                     0x17; //0x3F for stay in tx, stay in rx
+u8_t MCSM0 =                    0x18; // 0b00110100
+u8_t MCSM1 =                    0x17; //0x3F for stay in tx, stay in rx
 u8_t READ_FLAG =                0x80;
 u8_t WRITE_FLAG =               0x00;
 u8_t BURST_FLAG =               0x40;
@@ -60,6 +61,8 @@ u8_t BURST_FLAG =               0x40;
 u8_t PKTCTRL0 = 0x08; // 0b01000100
 u8_t PKTCTRL1 = 0x07; // 0b00001100
 u8_t PKTLEN = 0x06; // PACKET_LENGTH = 5
+u8_t TXBYTES = 0xFA;
+u8_t RXBYTES = 0xFB;
 
 
 class Status {
@@ -104,8 +107,11 @@ public:
         tx_buffer[0] = SRES;
         HAL_SPI_TransmitReceive(&hspi1, tx_buffer, rx_buffer, 1, 0xFFFF);
         while (!IsReady()) {}
+        Send(SFRX);
+        Send(SFTX);
 //        WriteRegister(MCSM1, 0x3E);
-        WriteRegister(MCSM1, 0x10);
+        WriteRegister(MCSM1, 0b00110000);
+        WriteRegister(MCSM0, 0b00110100);
         WriteRegister(PKTCTRL0, 0b01000100);
         WriteRegister(PKTCTRL1, 0b00001100);
         WriteRegister(PKTLEN, 5);
@@ -138,6 +144,11 @@ public:
     Status WriteTxFifo(u8_t byte) {
         Send(RF::SINGLE_BYTE_TX_FIFO);
         return Send(byte);
+    }
+
+    u8_t ReadRxFifo() {
+        Send(RF::SINGLE_BYTE_RX_FIFO);
+        return Receive();
     }
 
     void EnterTxMode() {

@@ -113,6 +113,10 @@ void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart) {
     HAL_UART_Receive_IT(&huart1, input_buffer, buf_size);
 }
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -593,44 +597,80 @@ void StartUartTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-      TButtonMsg msg;
-      while (pdPASS == xQueueReceive(ledCommandsHandle, &msg, 10)) {
-          char b = msg.button + '0';
-          static char buffer[] = "btnX\r\n";
-          buffer[3] = b;
-          HAL_UART_Transmit(&huart1, (uint8_t *)buffer, 6, 0xFFFF);
-
-          ext_status = radio.ReadRegister(RF::MARCSTATE);
-
-//          radio.WriteTxFifo(1);
-//          radio.WriteTxFifo(1);
-//          radio.EnterTxMode();
-
-          auto status = radio.GetStatus();
-          if (status.state == RF::IDLE) {
-              radio.EnterRxMode();
-          }
-      }
-
-      RF::Status status;
-      status = radio.GetStatus();
-      ext_status = radio.ReadRegister(RF::MARCSTATE);
-      rx_bytes = radio.ReadRegister(0xFB);
-      if (status.state == RF::RXFIFO_OVERFLOW) {
-
-          static char buffer[] = "overflow\r\n";
-          uint8_t left_rx_fifo = status.available;
-          int cnt = 0;
-
-          do {
-              buffer[cnt++] = left_rx_fifo % 10 + '0';
-              left_rx_fifo /= 10;
-          } while (left_rx_fifo > 0);
-
-          HAL_UART_Transmit(&huart1, (uint8_t *)buffer, 10, 0xFFFF);
-          radio.SendStrobe(RF::SFRX);
-      }
+      radio.CsLow();
       osDelay(10);
+      radio.CsHigh();
+      radio.Reset();
+      taskENTER_CRITICAL();
+      HAL_UART_Transmit(&huart1, (uint8_t *)"lap\r\n", 5, 0xFFFF);
+//
+////      TButtonMsg msg;
+////      while (pdPASS == xQueueReceive(ledCommandsHandle, &msg, 10)) {
+////          char b = msg.button + '0';
+////          static char buffer[] = "btnX\r\n";
+////          buffer[3] = b;
+////          HAL_UART_Transmit(&huart1, (uint8_t *)buffer, 6, 0xFFFF);
+////
+////          ext_status = radio.ReadRegister(RF::MARCSTATE);
+////
+////          auto status = radio.GetStatus();
+////          if (status.state == RF::IDLE) {
+////              radio.EnterRxMode();
+////          }
+////      }
+//
+//      radio.SendStrobe(RF::IDLE);
+//      RF::Status before_idle;
+//      do {
+//          before_idle = radio.GetStatus();
+//      } while (RF::IDLE != before_idle.state);
+//      HAL_UART_Transmit(&huart1, (uint8_t *)"idled\r\n", 7, 0xFFFF);
+//
+//      int unread_cnt = radio.ReadRegister(RF::RXBYTES);
+//      if (unread_cnt >= 7) {
+//          HAL_UART_Transmit(&huart1, (uint8_t *)"received\r\n", 10, 0xFFFF);
+//          static char buffer[10];
+//          buffer[8] = '\r';
+//          buffer[9] = '\n';
+//          for (int i = 0; i < 7; ++i) {
+//              buffer[i] = radio.Receive();
+//          }
+//          HAL_UART_Transmit(&huart1, (uint8_t *)buffer, 7, 0xFFFF);
+//          radio.SendStrobe(RF::SFRX);
+//      }
+//      HAL_UART_Transmit(&huart1, (uint8_t *)"read\r\n", 6, 0xFFFF);
+//
+//      radio.SendStrobe(RF::SFTX);
+//      for (int i = 0; i < 5; ++i) {
+//          radio.WriteTxFifo(i + '0');
+//      }
+//
+//      radio.EnterTxMode();
+//      HAL_UART_Transmit(&huart1, (uint8_t *)"enter\r\n", 7, 0xFFFF);
+//
+//      int left;
+//      do {
+//          left = radio.ReadRegister(RF::TXBYTES);
+////          static char buffer[10];
+////          for (int i = 0; i < 5; ++i) {
+////              buffer[i] = radio.Receive();
+////              int cnt = 0;
+////              do {
+////                  buffer[cnt++] = left % 10 + '0';
+////                  left /= 10;
+////              } while (left > 0);
+////              HAL_UART_Transmit(&huart1, (uint8_t *)buffer, 10, 0xFFFF);
+////          }
+////
+////          osDelay(100);
+//      } while (left > 0);
+//      HAL_UART_Transmit(&huart1, (uint8_t *)"sent\r\n", 6, 0xFFFF);
+//
+//      radio.EnterRxMode();
+//
+      HAL_UART_Transmit(&huart1, (uint8_t *)"rx\r\n", 4, 0xFFFF);
+    taskEXIT_CRITICAL();
+      osDelay(1000);
   }
   /* USER CODE END StartUartTask */
 }
